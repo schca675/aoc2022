@@ -9,7 +9,7 @@ def solve_part_1(filepath):
             if line == "\n":
                 # check if current elf has the highest calories
                 if current_elf > highest_cals:
-                    # then set 
+                    # then set
                     highest_cals = current_elf
                 # reset counter for next elf
                 current_elf = 0
