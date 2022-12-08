@@ -88,7 +88,7 @@ def solve_part_1(start_crates, filepath, p1_rearrange_individually=True):
     return print_crates(start_crates)
 
 print("Part 1")
-# print("test", solve_part_1(test_crates, "test_data.txt"))
+# print("test", solve_part_1_and_2(test_crates, "test_data.txt"))
 print("solution: ", solve_part_1(crates, "data.txt"))
 
 test_crates = {
