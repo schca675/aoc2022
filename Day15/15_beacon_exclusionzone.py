@@ -66,14 +66,7 @@ def solve_p2(beacon_rad, min_pos, max_pos, beacon_list, pmin=0, pmax=4000000):
     # my = [(s[1] - d, s, d) for s, d in beacon_rad.items()]
     # my.sort()
     lines = {} # does not include end
-    # lines_done = set()
-    # # row: [max_pos[0], min_pos[0], set()]
-    # reached_x_start_sorted = []
-    # reached_x_end = []
-    # reached_xses = set()
-    # nbr_occupied = 0
     # #
-    # prev_reached = 0
 
     for s in sensors:
         # check if rows can be removed, because sensors ordered according to reach (from reaching low y indexes to higher)
@@ -81,58 +74,144 @@ def solve_p2(beacon_rad, min_pos, max_pos, beacon_list, pmin=0, pmax=4000000):
         rows_before_this_one = [rowi for rowi in lines.keys() if rowi < s[1]-beacon_rad[s]]
         # check if row is completed and can be removed
         for rowi in rows_before_this_one:
-            if lines[rowi][0] <= pmin and lines[rowi][1] >= pmax:
-                if len(lines[rowi][2]) == 0:
-                    lines.pop(rowi)
-            #     else:
-            #         # canno treach this anymore because all sensors will only reach higher indices.
-            #         return lines[rowi][2]
-            # else:
-            #     return lines[rowi]
+            if len(lines[rowi]) == 1 and lines[rowi][0][0] <= pmin and lines[rowi][0][1] >= pmax:
+                # only a single row that is all filled.
+                lines.pop(rowi)
         # check manhatten distance from entire row
         # sensor reaches all lines up to -d to d:
+        a = 0
         for row in range(max(0, s[1]-beacon_rad[s]), s[1]+beacon_rad[s]+1):
             d = abs(row - s[1])
             n_inline_besides = (1 + (beacon_rad[s] - d) * 2) // 2
             n_line = [s[0] - n_inline_besides, s[0] + n_inline_besides] # including bounds
             # check if row already in lines
-            if row in lines.keys():
+            if row in lines.keys(): #
                 # have already stored this row, add new sensor input:
-
-                if n_line[0] >= lines[row][1]:
-                    # start of this line is beyond previously recorded end index --> entirely new line, add all points in between to holes set
-                    for i in range(lines[row][1], n_line[0]):
-                        lines[row][2].add(i)
-                    lines[row][1] = n_line[1] + 1
-                elif n_line[1] < lines[row][0]:
-                    #entirely to left of previously recorded
-                    for i in range(n_line[1] + 1, lines[row][0]):
-                        # new empty spots
-                        lines[row][2].add(i)
+                # check whether line is behind existing lines:
+                row_wlines = lines[row]
+                if n_line[0] >= row_wlines[-1][1]: # check last line and see if begin is behind that end
+                    # --- a--b c---d x--y
+                    # since it is stored, there is at least one line present (one item present in list)
+                    # start of this line is beyond previously recorded end indexes --> entirely new line, add all points in between to holes set
+                    row_wlines.append([n_line[0], n_line[1]+1])
+                elif n_line[1] <= row_wlines[0][0]:
+                    # x--y a--b c--d
+                    # entirely to left of previously recorded
                     # shift beginning of existing line to beginning of this sensor's row, including
-                    lines[row][0] = n_line[0]
+                    if n_line[1]+1 >= row_wlines[0][0]:
+                        row_wlines[0][0] = n_line[0]
+                    else:
+                        row_wlines.insert(0,[n_line[0], n_line[1]+1])
                 else:
-                    # overlaps with previously recorded line
-                    if n_line[1] >= lines[row][1]:
-                        # set is not entirely covered, shift end of line
-                        lines[row][1] = n_line[1] + 1
-                    if  n_line[0] < lines[row][0]:
-                        lines[row][0] = n_line[0]
-                    # check for holes that are now filled
-                    lines[row][2] = set([x for x in lines[row][2] if x < n_line[0] or x > n_line[1]])
-                    # to_remove = set(
-                    #     [x for x in lines[row][2] if n_line[0] <= x <= n_line[1]])
-                    # lines[row][2] = lines[row][2].difference(to_remove)
+                    # overlaps or between previously recorded lines; get line parts where x_start is between
+                    # get first index where n_line[0] is larger than
+                    # [a,b] x [c, d] where a <= nline[0] <=c
+                    c_i = -1
+                    for i in range(0, len(row_wlines)):
+                        if n_line[0] <= row_wlines[i][0]:
+                            c_i = i
+                            break
+                    if c_i <0:
+                        # then we must have .... e-x-f--y for last item
+                        if n_line[1] >= row_wlines[-1][1]:
+                            row_wlines[-1][1] = n_line[1] + 1
+                    # check whether end nline[1] >b
+                    elif c_i == 0:
+                        # x ---a-y---b or x---a---b--y
+                        # will start at n_line[0] then ; already checked that end is not before first begin
+                        end = max(row_wlines[c_i][1], n_line[1]+1)
+                        to_del = []
+                        j = c_i + 1
+                        while j < len(row_wlines) and n_line[1]+1 >= row_wlines[j][0]:
+                            # remove this one and add it to prev
+                            end = max(n_line[1]+1, row_wlines[j][1])
+                            to_del.append(j)
+                            j+=1
+                        for j in to_del:
+                            row_wlines.pop(j)
+                            # x---a---b--y
+                            # change end too:
+                        row_wlines[c_i][1] = end
+                        row_wlines[c_i][0] = n_line[0]
+                    # a---x--b---y c---d  or   a---x--b-----c-y--d or a---x--b--c--d--y or
+                    #  a--b x--y c--d    or a--b x--c-y-d or  a--b x--c--d--y
+                    # a--x--y--b c--d
+                    elif n_line[1] < row_wlines[c_i-1][1]:
+                        # a--x--y--b c--d
+                        pass
+                    elif  n_line[0] <= row_wlines[c_i-1][1]:
+                        # a---x--b---y c---d  or   a---x--b-----c-y--d or a---x--b--c--d--y
+                        if n_line[1] >= row_wlines[c_i][1]:
+                            #  a---x--b--c--d--y ---> see until where y goes
+                            end = max(row_wlines[c_i][1], n_line[1]+1)
+                            to_del = [c_i]
+                            j = c_i + 1
+                            while j < len(row_wlines) and n_line[1]+1 >= row_wlines[j][0]:
+                                # remove this one and add it to prev
+                                end = max(n_line[1] + 1, row_wlines[j][1])
+                                to_del.append(j)
+                                j += 1
+                            to_del.sort(reverse=True)
+                            for j in to_del:
+                                row_wlines.pop(j)
+                                # change end too:
+                            row_wlines[c_i-1][1] = end
+
+                        elif n_line[1] == row_wlines[c_i][0] or n_line[1] + 1 == row_wlines[c_i][0]:
+                            #         a---x--b---yc---d
+                            row_wlines[c_i - 1][1] = row_wlines[c_i][1]
+                            row_wlines.pop(c_i)
+                        elif n_line[1] < row_wlines[c_i][0]:
+                            #         a---x--b---y c---d
+                            row_wlines[c_i-1][1] = n_line[1] + 1
+                        else:
+                            #  a---x--b-----c-y--d
+                            row_wlines[c_i - 1][1] = row_wlines[c_i][1]
+                            row_wlines.pop(c_i)
+                    #  a--b x--y c--d    or a--b x--c-y-d or  a--b x--c--d--y
+                    else:
+                        if n_line[1] >= row_wlines[c_i][1]:
+                            #  a--b x--c--d--y
+
+                            end = n_line[1] + 1
+                            to_del = []
+                            j = c_i + 1
+                            while j < len(row_wlines) and n_line[1] + 1 >= row_wlines[j][0]:
+                                # remove this one and add it to prev
+                                end = max(n_line[1] + 1, row_wlines[j][1])
+                                to_del.append(j)
+                                j += 1
+                            for j in to_del:
+                                row_wlines.pop(j)
+                                # change end too:
+                            row_wlines[c_i][1] = end
+                            row_wlines[c_i][0] = n_line[0]
+                        elif n_line[1] < row_wlines[c_i][0]:
+                            # a--b x--y c--d
+                            row_wlines.insert(c_i, [n_line[0], n_line[1] + 1])
+                        else:
+                            # a--b x--c-y-d
+                            row_wlines[c_i][0] = n_line[0]
             else:
                 #add exactly what this sensor reaches
-                lines[row] = [n_line[0], n_line[1]+1, set()]
+                lines[row] = [[n_line[0], n_line[1]+1]]
     # take out all lines that are filled:
     remaining = []
     for y, rowi in lines.items():
-        if pmin <= y <= pmax:
-            if not (rowi[0] <= pmin and rowi[1] >= pmax and len(rowi[2]) == 0):
-                remaining.append((rowi, y))
-    return remaining[0][0][2].pop()*4000000 + remaining[0][1]
+        if y<=pmax and len(rowi) > 1:
+            # should be two:
+            remaining.append((y, rowi))
+        # if pmin <= y <= pmax:
+        #     if not (rowi[0] <= pmin and rowi[1] >= pmax and len(rowi[2]) == 0):
+        #         remaining.append((rowi, y))
+    res = -1
+    if len(remaining) == 1:
+        # row = [(y, [[a, x], [x+1, b]])]
+        # 130 s
+        #must be correct, result = x * + y
+        res = remaining[0][1][0][1]*4000000 + remaining[0][0]
+    return remaining, res
+    # return remaining[0][0][2].pop()*4000000 + remaining[0][1]
 
 
         # max=3
